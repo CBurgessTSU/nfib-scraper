@@ -14,21 +14,81 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 /**
- * GET /scrape?indicator=expand_good&months=12
- * 
+ * GET /scrape?indicator=expand_good&date=10/1/2025
+ *
  * Scrapes a single indicator
+ * - If date is provided, returns data for that specific date
+ * - If no date is provided, returns the entire time series
  */
 app.get('/scrape', async (req, res) => {
     try {
-        const indicator = req.query.indicator || 'expand_good';
-        const months = parseInt(req.query.months) || 12;
+        const indicator = req.query.indicator;
+        const requestedDate = req.query.date;
 
-        const data = await scrapeNFIBIndicator(indicator, months);
-        res.json(data);
+        if (!indicator) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameter: indicator',
+                indicator: null,
+                date: null,
+                value: null
+            });
+        }
+
+        console.log(`[${new Date().toISOString()}] Scraping indicator: ${indicator}${requestedDate ? ` for date: ${requestedDate}` : ' (all dates)'}`);
+
+        // Get all data (we'll filter by date if needed)
+        const data = await scrapeNFIBIndicator(indicator, 999);
+
+        if (requestedDate) {
+            // Filter to the specific date
+            const match = data.data.find(item => item.date === requestedDate);
+
+            if (!match) {
+                return res.status(404).json({
+                    success: false,
+                    indicator: indicator,
+                    date: requestedDate,
+                    value: null,
+                    error: `No data found for date: ${requestedDate}`,
+                    scraped_at: data.scraped_at
+                });
+            }
+
+            res.json({
+                success: true,
+                indicator: indicator,
+                date: match.date,
+                value: match.value,
+                scraped_at: data.scraped_at
+            });
+
+            console.log(`[${new Date().toISOString()}] Successfully scraped ${indicator} for ${requestedDate}: ${match.value}`);
+
+        } else {
+            // Return all data
+            res.json({
+                success: true,
+                indicator: indicator,
+                data: data.data,
+                count: data.data.length,
+                scraped_at: data.scraped_at
+            });
+
+            console.log(`[${new Date().toISOString()}] Successfully scraped ${indicator}: ${data.data.length} data points`);
+        }
+
     } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error scraping ${req.query.indicator}:`, error.message);
+
         res.status(500).json({
+            success: false,
+            indicator: req.query.indicator,
+            date: req.query.date || null,
+            value: null,
             error: error.message,
-            indicator: req.query.indicator
+            error_type: error.name,
+            scraped_at: new Date().toISOString()
         });
     }
 });

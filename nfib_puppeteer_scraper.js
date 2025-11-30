@@ -24,7 +24,7 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
 
     try {
         const page = await browser.newPage();
-        
+
         // Navigate to the NFIB Indicators page
         await page.goto('https://www.nfib-sbet.org/Indicators.html', {
             waitUntil: 'networkidle2',
@@ -34,48 +34,65 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
         // Wait for the page to fully load
         await page.waitForSelector('#indicators1', { timeout: 30000 });
 
-        // Select the desired indicator from the dropdown
-        await page.evaluate((code) => {
-            const select = document.getElementById('indicators1');
-            select.value = code;
-            // Trigger the change event to load data
-            const event = new Event('change', { bubbles: true });
-            select.dispatchEvent(event);
-        }, indicatorCode);
+        // Select the desired indicator using Puppeteer's select method
+        await page.select('#indicators1', indicatorCode);
 
-        // Wait for the chart to render with data
-        await page.waitForTimeout(5000); // Give it time to fetch and render
+        // Click SHOW RESULTS button using real click (not JavaScript click)
+        const showResultsButtons = await page.$$('#showResults');
+        if (showResultsButtons.length > 0) {
+            await showResultsButtons[0].click();
+        } else {
+            throw new Error('SHOW RESULTS button not found');
+        }
+
+        // IMPORTANT: The site says "Please allow 1 minute when loading the Optimism Index & Uncertainty Index
+        // and 10-15 seconds when loading other indecies"
+        const isSlowIndicator = indicatorCode === 'OPT_INDEX' || indicatorCode === 'un_index';
+        const maxWaitTime = isSlowIndicator ? 90000 : 40000; // 90s for slow ones, 40s for others
+
+        // Wait for the chart to be recreated with data (uses generic "indexvalue" field after clicking SHOW RESULTS)
+        await page.waitForFunction(() => {
+            const chart = $('#indicatorChart').data('kendoStockChart') || $('#indicatorChart').data('kendoChart');
+            if (!chart) return false;
+            const dataSource = chart.dataSource;
+            if (!dataSource) return false;
+            const data = dataSource.data();
+            if (!data || data.length === 0) return false;
+            // After clicking SHOW RESULTS, the data uses "indexvalue" field
+            return data[0].hasOwnProperty('indexvalue');
+        }, { timeout: maxWaitTime });
 
         // Extract the data from the Kendo chart
         const chartData = await page.evaluate(() => {
             // The Kendo chart stores data in the dataSource
             const chart = $('#indicatorChart').data('kendoStockChart') || $('#indicatorChart').data('kendoChart');
-            
+
             if (!chart) {
                 return { error: 'Chart not found' };
             }
 
             const dataSource = chart.dataSource;
             const data = dataSource.data();
-            
-            // Extract the values
+
+            // Extract the values - after clicking SHOW RESULTS, data uses "indexvalue" field
+            // and is sorted oldest-first
             const results = [];
             data.forEach(item => {
                 results.push({
                     date: item.monthyear,
-                    value: item.percent || item.value || item[Object.keys(item).find(k => typeof item[k] === 'number')]
+                    value: item.indexvalue
                 });
             });
 
-            return results;
+            return { results, totalCount: data.length };
         });
 
         if (chartData.error) {
             throw new Error(chartData.error);
         }
 
-        // Get the most recent N months
-        const recentData = chartData.slice(-numMonths);
+        // Get the most recent N months (data is sorted oldest-first, so take from the end)
+        const recentData = chartData.results.slice(-numMonths);
 
         return {
             indicator: indicatorCode,
@@ -91,11 +108,12 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
 }
 
 /**
- * Extract multiple indicators at once
+ * Extract multiple indicators at once (sequentially to avoid overwhelming the site)
  */
 async function scrapeMultipleIndicators(indicators, numMonths = 12) {
     const results = {};
-    
+
+    // Scrape indicators one at a time (site is too slow for parallel requests)
     for (const indicator of indicators) {
         console.log(`Scraping ${indicator}...`);
         try {
@@ -104,7 +122,7 @@ async function scrapeMultipleIndicators(indicators, numMonths = 12) {
             results[indicator] = { error: error.message };
         }
     }
-    
+
     return results;
 }
 
