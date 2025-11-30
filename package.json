@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node nfib_puppeteer_scraper.js"
+    "test": "node nfib_puppeteer_scraper.js",
+    "postinstall": "node node_modules/puppeteer/install.mjs"
   },
   "keywords": ["nfib", "scraper", "puppeteer", "economic-indicators"],
   "author": "",

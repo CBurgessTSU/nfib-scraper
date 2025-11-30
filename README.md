@@ -148,12 +148,36 @@ curl "http://localhost:3000/indicators"
 
 ## Deployment to Render.com
 
-1. Push this code to GitHub
-2. Create new Web Service on Render
-3. Connect your GitHub repo
-4. Render will auto-detect Node.js and use `npm start`
-5. Set environment: Node 18+
-6. Your API will be available at `https://your-app.onrender.com`
+The repository includes a `render.yaml` file that automatically configures everything needed for deployment.
+
+### Steps:
+
+1. **Push to GitHub** (already done)
+
+2. **Create New Web Service on Render:**
+   - Go to [Render Dashboard](https://dashboard.render.com/)
+   - Click "New +" → "Web Service"
+   - Connect your GitHub repository: `CBurgessTSU/nfib-scraper`
+
+3. **Render will automatically:**
+   - Detect the `render.yaml` configuration
+   - Install Node.js 18
+   - Run `npm install`
+   - Install Chrome via Puppeteer
+   - Start the server with `npm start`
+
+4. **Wait for deployment** (~5-10 minutes for first deploy)
+   - Chrome installation takes a few minutes
+   - Render will show build logs
+
+5. **Your API will be live at:**
+   - `https://nfib-scraper.onrender.com` (or your custom name)
+
+### Important Notes:
+
+- **Free tier sleeps after inactivity** - First request after sleep takes ~30 seconds to wake up
+- **Chrome download happens during build** - This is why first deploy takes longer
+- **Subsequent deploys are faster** - Chrome is cached
 
 ## Notes
 
