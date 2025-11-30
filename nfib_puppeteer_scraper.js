@@ -10,6 +10,7 @@
  */
 
 const puppeteer = require('puppeteer');
+const { execSync } = require('child_process');
 
 /**
  * Extract seasonally adjusted data for a specific indicator
@@ -17,10 +18,32 @@ const puppeteer = require('puppeteer');
  * @param {number} numMonths - How many recent months to extract (default: 12)
  */
 async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12) {
-    const browser = await puppeteer.launch({
+    // Puppeteer launch options - handle both local and Render environments
+    const launchOptions = {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu'
+        ]
+    };
+
+    // On Render, find Chrome dynamically
+    if (process.env.RENDER) {
+        try {
+            // Find Chrome in the Puppeteer cache
+            const chromePath = execSync('find /opt/render/.cache/puppeteer -name chrome -type f 2>/dev/null | head -1').toString().trim();
+            if (chromePath) {
+                launchOptions.executablePath = chromePath;
+                console.log(`Using Chrome at: ${chromePath}`);
+            }
+        } catch (error) {
+            console.error('Error finding Chrome:', error.message);
+        }
+    }
+
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         const page = await browser.newPage();

@@ -122,6 +122,31 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /debug
+ * Debug endpoint to check Chrome installation
+ */
+app.get('/debug', (req, res) => {
+    const { execSync } = require('child_process');
+
+    try {
+        const chromePath = execSync('find /opt/render/.cache/puppeteer -name chrome -type f 2>/dev/null | head -1').toString().trim();
+        const cacheContents = execSync('ls -la /opt/render/.cache/puppeteer 2>&1').toString();
+
+        res.json({
+            environment: process.env.RENDER ? 'Render' : 'Local',
+            chromePath: chromePath || 'Not found',
+            cacheDirectory: cacheContents.split('\n').slice(0, 20)
+        });
+    } catch (error) {
+        res.json({
+            environment: process.env.RENDER ? 'Render' : 'Local',
+            error: error.message,
+            stack: error.stack
+        });
+    }
+});
+
+/**
  * GET /indicators
  * List available indicators
  */
