@@ -125,18 +125,25 @@ app.get('/health', (req, res) => {
  * GET /debug
  * Debug endpoint to check Chrome installation
  */
-app.get('/debug', (req, res) => {
-    const { execSync } = require('child_process');
-
+app.get('/debug', async (req, res) => {
     try {
-        const chromePath = execSync('find /opt/render/.cache/puppeteer -name chrome -type f 2>/dev/null | head -1').toString().trim();
-        const cacheContents = execSync('ls -la /opt/render/.cache/puppeteer 2>&1').toString();
+        const isRender = !!process.env.RENDER;
+        const debugInfo = {
+            environment: isRender ? 'Render' : 'Local',
+            nodeVersion: process.version
+        };
 
-        res.json({
-            environment: process.env.RENDER ? 'Render' : 'Local',
-            chromePath: chromePath || 'Not found',
-            cacheDirectory: cacheContents.split('\n').slice(0, 20)
-        });
+        if (isRender) {
+            const chromium = require('@sparticuz/chromium');
+            debugInfo.chromiumPackage = '@sparticuz/chromium';
+            debugInfo.executablePath = await chromium.executablePath();
+            debugInfo.chromiumArgs = chromium.args.length + ' args';
+        } else {
+            const puppeteer = require('puppeteer');
+            debugInfo.puppeteerVersion = puppeteer._launcher?._productName || 'bundled';
+        }
+
+        res.json(debugInfo);
     } catch (error) {
         res.json({
             environment: process.env.RENDER ? 'Render' : 'Local',

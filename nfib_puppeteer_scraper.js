@@ -9,8 +9,16 @@
  * then call it from n8n to get the data.
  */
 
-const puppeteer = require('puppeteer');
-const { execSync } = require('child_process');
+// Use puppeteer-core with chromium on Render, regular puppeteer locally
+let puppeteer;
+let chromium;
+
+if (process.env.RENDER) {
+    puppeteer = require('puppeteer-core');
+    chromium = require('@sparticuz/chromium');
+} else {
+    puppeteer = require('puppeteer');
+}
 
 /**
  * Extract seasonally adjusted data for a specific indicator
@@ -25,22 +33,17 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--single-process',
+            '--no-zygote'
         ]
     };
 
-    // On Render, find Chrome dynamically
+    // On Render, use the @sparticuz/chromium package
     if (process.env.RENDER) {
-        try {
-            // Find Chrome in the Puppeteer cache
-            const chromePath = execSync('find /opt/render/.cache/puppeteer -name chrome -type f 2>/dev/null | head -1').toString().trim();
-            if (chromePath) {
-                launchOptions.executablePath = chromePath;
-                console.log(`Using Chrome at: ${chromePath}`);
-            }
-        } catch (error) {
-            console.error('Error finding Chrome:', error.message);
-        }
+        launchOptions.executablePath = await chromium.executablePath();
+        launchOptions.args = chromium.args;
+        console.log(`Using Chromium on Render`);
     }
 
     const browser = await puppeteer.launch(launchOptions);
