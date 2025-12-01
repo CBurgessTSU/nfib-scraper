@@ -35,7 +35,10 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--single-process',
-            '--no-zygote'
+            '--no-zygote',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-blink-features=AutomationControlled'
         ]
     };
 
@@ -47,9 +50,13 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
     }
 
     const browser = await puppeteer.launch(launchOptions);
+    let page;
 
     try {
-        const page = await browser.newPage();
+        page = await browser.newPage();
+
+        // Set a reasonable page cache to reduce memory
+        await page.setCacheEnabled(false);
 
         // Navigate to the NFIB Indicators page
         await page.goto('https://www.nfib-sbet.org/Indicators.html', {
@@ -129,7 +136,17 @@ async function scrapeNFIBIndicator(indicatorCode = 'expand_good', numMonths = 12
     } catch (error) {
         throw new Error(`Failed to scrape NFIB data: ${error.message}`);
     } finally {
-        await browser.close();
+        // Explicitly close page first to release memory faster
+        if (page) {
+            await page.close().catch(() => {});
+        }
+        if (browser) {
+            await browser.close().catch(() => {});
+        }
+        // Force garbage collection if available (helps reduce memory usage)
+        if (global.gc) {
+            global.gc();
+        }
     }
 }
 

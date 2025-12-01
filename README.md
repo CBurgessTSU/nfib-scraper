@@ -96,16 +96,32 @@ Your 6 required indicators:
 
 See `/indicators` endpoint for full list of available indicators.
 
+## Important: Memory Limitations on Render Free Tier
+
+**⚠️ Critical:** Render's free tier has limited memory (512MB). Running Chromium is memory-intensive, so:
+
+1. **Wait between requests:** Allow 60-90 seconds between scrape requests to let memory clear
+2. **The service may crash** after 2-3 consecutive scrapes if requests come too quickly
+3. **If you get 502 errors:** The service has crashed and needs to be manually restarted:
+   - Go to Render dashboard → Your service → "Manual Deploy" → "Deploy latest commit"
+4. **Recommended:** Upgrade to Render's paid tier ($7/month) for reliable operation with multiple requests
+
 ## n8n Integration
 
 In n8n, create separate HTTP Request nodes for each indicator you need.
 
+**IMPORTANT:** Add delays between requests to avoid memory crashes on Render's free tier.
+
 ### Option 1: Get Latest Value (Recommended for most use cases)
 Add the date parameter for the most recent month:
 
-1. **Method:** GET
-2. **URL:** `https://your-app.onrender.com/scrape?indicator=OPT_INDEX&date=10/1/2025`
-3. **Repeat for each indicator** (change the indicator parameter)
+**Example n8n workflow (with delays to prevent crashes):**
+1. **HTTP Request node:** GET `https://your-app.onrender.com/scrape?indicator=OPT_INDEX&date=10/1/2025`
+2. **Wait node:** 90 seconds
+3. **HTTP Request node:** GET `https://your-app.onrender.com/scrape?indicator=expand_good&date=10/1/2025`
+4. **Wait node:** 90 seconds
+5. **HTTP Request node:** GET next indicator...
+6. Repeat with 90-second waits between each indicator
 
 ### Option 2: Get Entire Time Series
 Omit the date parameter to get all historical data (useful for backfilling or analysis):
